@@ -97,12 +97,13 @@ void nDestroySem(nSem sem); /* Destruye un semaforo */
  * Cuidado! Estos monitores no son reentrantes
  *************************************************************/
  
-nMonitor nMakeMonitor();             /* Construye un monitor */
-void nDestroyMonitor(nMonitor mon);  /* Destruye un monitor */
-void nEnter(nMonitor mon);           /* Ingreso al monitor */
-void nExit(nMonitor mon);            /* Salida del monitor */
-void nWait(nMonitor mon);            /* Libera el monitor y suspende */
-void nNotifyAll(nMonitor mon);       /* Retoma tareas suspendidas */
+nMonitor nMakeMonitor();                      /* Construye un monitor */
+void nDestroyMonitor(nMonitor mon);           /* Destruye un monitor */
+void nEnter(nMonitor mon);                    /* Ingreso al monitor */
+void nExit(nMonitor mon);                     /* Salida del monitor */
+void nWait(nMonitor mon);                     /* Libera el monitor y suspende */
+void nWaitTimeout(nMonitor mon, int timeout); /* Como nWait pero con timeout */
+void nNotifyAll(nMonitor mon);                /* Retoma tareas suspendidas */
  
 nCondition nMakeCondition(nMonitor mon); /* Construye una condicion */
 void nDestroyCondition(nCondition cond); /* Destruye una condicion */
