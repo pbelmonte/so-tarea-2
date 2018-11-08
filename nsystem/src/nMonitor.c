@@ -89,6 +89,33 @@ void nWait(nMonitor mon)
   END_CRITICAL();
 }
 
+void nWaitTimeout(nMonitor mon, int timeout)
+{
+  START_CRITICAL();
+
+  if (mon->owner!=current_task)
+    nFatalError("nWaitTimeout", "This thread does not own this monitor\n");
+
+  mon->owner= NULL;
+  
+  if (timeout>0)
+    {
+      current_task->status= WAIT_COND_TIMEOUT;
+      ProgramTask(timeout);
+      /* La tarea se despertara automaticamente despues de timeout */
+    }
+  else current_task->status= WAIT_COND; /* La tarea espera indefinidamente */
+
+  ResumeNextReadyTask(); /* Se suspende indefinidamente hasta un nNotifyAll */
+
+  if (current_task->status == WAIT_COND_TIMEOUT)
+    CancelTask(current_task);
+
+  mon->owner= current_task;
+
+  END_CRITICAL();
+}
+
 void nNotifyAll(nMonitor mon)
 {
   START_CRITICAL();
