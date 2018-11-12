@@ -7,14 +7,14 @@ typedef struct
   Queue mqueue;
   FifoQueue wqueue;
 }
-  *nMonitor;
+*nMonitor;
 
 typedef struct
 {
   nMonitor mon;
   FifoQueue wqueue;
 }
-  *nCondition;
+*nCondition;
 
 #define NOVOID_NMONITOR
 
@@ -91,29 +91,42 @@ void nWait(nMonitor mon)
 
 void nWaitTimeout(nMonitor mon, int timeout)
 {
-  START_CRITICAL();
+  /* Si timeout < 0 entonces simplemente se usa nWait, esperando indefinidamente */
+  if (timeout < 0)
+    nWait(mon);
 
-  if (mon->owner!=current_task)
-    nFatalError("nWaitTimeout", "This thread does not own this monitor\n");
+  else
+  {
+    START_CRITICAL();
 
-  mon->owner= NULL;
-  
-  if (timeout>0)
+    /* La primera parte del codigo es exactamente igual a nWait, pero se le agrega ProgramTask para que exista el timeout */
+    if (mon->owner!=current_task)
+      nFatalError("nWaitTimeout", "This thread does not own this monitor\n");
+    mon->owner= NULL;
+    current_task->status= WAIT_COND_TIMEOUT;
+    PutObj(mon->wqueue, current_task);
+    ProgramTask(timeout);
+
+    /* Se comienza a ejecutar el siguiente proceso que este en estado READY */
+    ReadyFirstTask(mon->mqueue);
+    ResumeNextReadyTask();
+
+    /* Una vez que se despierta el proceso nuevamente, hay que revisar que nadie mas tenga el monitor para saber si se puede 
+    obtener. En caso de que este ocupado se espera para poder continuar */
+    if (mon->owner!=NULL)
     {
-      current_task->status= WAIT_COND_TIMEOUT;
-      ProgramTask(timeout);
-      /* La tarea se despertara automaticamente despues de timeout */
+      if (mon->owner==current_task)
+        nFatalError("nWaitTimeout", "Trying to own the same monitor twice\n");
+      current_task->status= WAIT_MON;
+      PutTask(mon->mqueue, current_task);
+      ResumeNextReadyTask();
     }
-  else current_task->status= WAIT_COND; /* La tarea espera indefinidamente */
 
-  ResumeNextReadyTask(); /* Se suspende indefinidamente hasta un nNotifyAll */
+    /* Se obtiene el monitor */
+    mon->owner= current_task;
 
-  if (current_task->status == WAIT_COND_TIMEOUT)
-    CancelTask(current_task);
-
-  mon->owner= current_task;
-
-  END_CRITICAL();
+    END_CRITICAL();
+  }
 }
 
 void nNotifyAll(nMonitor mon)
@@ -126,6 +139,11 @@ void nNotifyAll(nMonitor mon)
   while (!EmptyFifoQueue(mon->wqueue))
   {
     nTask task= (nTask)GetObj(mon->wqueue);
+
+    /* Si se despierta el proceso antes del timeout hay que cancelar el timeout */
+    if (task->status==WAIT_COND_TIMEOUT)
+      CancelTask(task);
+    
     task->status= WAIT_MON;
     PushTask(mon->mqueue, task);
   }
@@ -190,4 +208,4 @@ static void ReadyFirstTask(Queue queue)
   {
     task->status= READY;
     PushTask(ready_queue, task);
-} }
+  } }
